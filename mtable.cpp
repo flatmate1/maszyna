@@ -282,7 +282,8 @@ bool TTrainParameters::LoadTTfile(std::string scnpath, int iPlus, double vmax)
         }
         else
         { /*analiza rozkładu jazdy*/
-            ivfsstream fin(s);
+            std::string fileload = s;
+            ivfsstream fin(fileload);
             ConversionError = 0;
             while (fin.good() && !((ConversionError != 0) || EndTable))
             {

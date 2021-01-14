@@ -308,7 +308,7 @@ struct global_settings {
 
 	std::unordered_map<int, std::string> trainset_overrides;
 
-    eu07vfs_instance vfs;
+	eu07vfs_instance vfs_instance;
 
 // methods
     void LoadIniFile( std::string asFileName );
@@ -337,3 +337,25 @@ void
 global_settings::export_as_text( std::ostream &Output, std::string const Key, bool const &Value ) const;
 
 extern global_settings Global;
+
+class vfs_accessor_wrapper {
+	eu07vfs_accessor accessor;
+
+public:
+	vfs_accessor_wrapper() {
+		accessor = nullptr;
+	}
+
+	eu07vfs_accessor get(eu07vfs_instance instance) {
+		if (!accessor)
+			accessor = eu07vfs_create_accessor(instance);
+		return accessor;
+	}
+
+	~vfs_accessor_wrapper() {
+		if (accessor)
+			eu07vfs_destroy_accessor(accessor);
+	}
+};
+
+extern thread_local vfs_accessor_wrapper vfs_accessor;

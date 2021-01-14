@@ -83,7 +83,7 @@ scenarioloader_mode::enter() {
 
     simulation::is_ready = false;
 
-    m_userinterface->set_background( "logo" );
+    m_userinterface->load_random_background();
     Application.set_title( Global.AppName + " (" + Global.SceneryFile + ")" );
     m_userinterface->set_progress();
 	m_userinterface->set_progress(STR("Loading scenery"));

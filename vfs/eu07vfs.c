@@ -32,13 +32,23 @@ struct entry_header
 
 struct _eu07vfs_instance
 {
-	FILE *storage;
 	struct hashmap *hm;
+    char *filename;
+};
+
+struct _eu07vfs_accessor
+{
+    struct _eu07vfs_instance *instance;
+
+    FILE *storage;
+    uint64_t pos;
 };
 
 struct _eu07vfs_file_ctx
 {
-	uint64_t pos;
+    struct _eu07vfs_accessor *accessor;
+
+    uint64_t pos;
 	uint64_t left;
 	int lz4_enabled;
 	uint64_t original_size;
@@ -76,54 +86,84 @@ static bool user_iter(const void *item, void *udata) {
 	return true;
 }
 
-static inline void seek(FILE *file, uint64_t position)
+static inline void seek(struct _eu07vfs_accessor *accessor, uint64_t position)
 {
+    if (accessor->pos == position)
+        return;
+    accessor->pos = position;
 #ifdef _WIN32
-	_fseeki64(file, position, SEEK_SET);
+    _fseeki64(accessor->storage, position, SEEK_SET);
 #else
-	fseeko(file, position, SEEK_SET);
+    fseeko(accessor->storage, position, SEEK_SET);
 #endif
 }
 
 eu07vfs_instance eu07vfs_init(const char *path)
 {
-	FILE *base = fopen(path, "rb");
+    eu07vfs_instance instance = malloc(sizeof(struct _eu07vfs_instance));
+    size_t pathlen = strlen(path);
+    instance->filename = malloc(pathlen + 1);
+    strcpy(instance->filename, path);
+
+    eu07vfs_accessor accessor = eu07vfs_create_accessor(instance);
+
 	struct vfs_header header;
-	fread(&header, sizeof(header), 1, base);
-	if (header.magic != 0x5346565F37305545 || header.version != 1)
+    accessor->pos += fread(&header, 1, sizeof(header), accessor->storage);
+    if (header.magic != 0x5346565F37305545 || header.version != 1) {
+        eu07vfs_destroy_accessor(accessor);
+        free(instance->filename);
+        free(instance);
 		return NULL;
+    }
 
-	seek(base, (uint64_t)sizeof(header) + header.data_size);
+    seek(accessor, (uint64_t)sizeof(header) + header.data_size);
 
-	eu07vfs_instance instance = malloc(sizeof(struct _eu07vfs_instance));
 	instance->hm = hashmap_new(sizeof(struct hash_entry), 0, 0, 0, user_hash, user_compare, NULL);
-	instance->storage = base;
 
 	size_t processed = 0;
 	while (processed < header.entry_list_size) {
 		uint32_t entry_h[2];
 
-		fread(entry_h, 8, 1, base);
+        accessor->pos += fread(entry_h, 1, 8, accessor->storage);
 		processed += entry_h[0];
 
 		uint32_t filenamelen = entry_h[1];
 		char* filename = malloc(filenamelen + 1);
 		filename[filenamelen] = 0;
-		fread(filename, filenamelen, 1, base);
+        accessor->pos += fread(filename, filenamelen, 1, accessor->storage);
 
-		fread(entry_h, 4, 1, base);
-		if (entry_h[0] != 0x4C504552)
+        accessor->pos += fread(entry_h, 1, 4, accessor->storage);
+        if (entry_h[0] != 0x4C504552) {
+            eu07vfs_destroy_accessor(accessor);
+            hashmap_free(instance->hm);
+            free(instance->filename);
+            free(instance);
 			return NULL;
+        }
 
 		uint64_t offset;
-		fread(&offset, 8, 1, base);
+        accessor->pos += fread(&offset, 1, 8, accessor->storage);
 
 		hashmap_set(instance->hm, &(struct hash_entry){ .name = filename, .namelen = filenamelen, .offset = offset });
-
-		//free(filename);
 	}
 
+    eu07vfs_destroy_accessor(accessor);
 	return instance;
+}
+
+eu07vfs_accessor eu07vfs_create_accessor(eu07vfs_instance instance)
+{
+    eu07vfs_accessor accessor = malloc(sizeof(struct _eu07vfs_accessor));
+    accessor->instance = instance;
+    accessor->pos = 0;
+    accessor->storage = fopen(instance->filename, "rb");
+    return accessor;
+}
+
+void eu07vfs_destroy_accessor(eu07vfs_accessor accessor)
+{
+    fclose(accessor->storage);
+    free(accessor);
 }
 
 eu07vfs_file_handle eu07vfs_lookup_file(eu07vfs_instance instance, const char *file, size_t filelen)
@@ -134,15 +174,16 @@ eu07vfs_file_handle eu07vfs_lookup_file(eu07vfs_instance instance, const char *f
 	return entry->offset;
 }
 
-eu07vfs_file_ctx eu07vfs_open_file(eu07vfs_instance instance, eu07vfs_file_handle handle)
+eu07vfs_file_ctx eu07vfs_open_file(eu07vfs_accessor accessor, eu07vfs_file_handle handle)
 {
-	seek(instance->storage, (uint64_t)sizeof(struct vfs_header) + handle);
+    seek(accessor, (uint64_t)sizeof(struct vfs_header) + handle);
 	struct entry_header header;
-	fread(&header, sizeof(header), 1, instance->storage);
+    accessor->pos += fread(&header, 1, sizeof(header), accessor->storage);
 
 	eu07vfs_file_ctx ctx = malloc(sizeof(struct _eu07vfs_file_ctx));
 
-	ctx->pos = (uint64_t)sizeof(struct vfs_header) + handle + (uint64_t)sizeof(struct entry_header);
+    ctx->accessor = accessor;
+    ctx->pos = (uint64_t)sizeof(struct vfs_header) + handle + (uint64_t)sizeof(struct entry_header);
 	ctx->left = header.entry_size - (uint64_t)sizeof(struct entry_header);
 	ctx->buffer = NULL;
 	ctx->original_size = header.original_size;
@@ -165,12 +206,12 @@ eu07vfs_file_ctx eu07vfs_open_file(eu07vfs_instance instance, eu07vfs_file_handl
 	return ctx;
 }
 
-uint64_t eu07vfs_get_file_size(eu07vfs_instance instance, eu07vfs_file_ctx ctx)
+uint64_t eu07vfs_get_file_size(eu07vfs_file_ctx ctx)
 {
 	return ctx->original_size;
 }
 
-size_t eu07vfs_read_file(eu07vfs_instance instance, eu07vfs_file_ctx ctx, void *output, size_t size)
+size_t eu07vfs_read_file(eu07vfs_file_ctx ctx, void *output, size_t size)
 {
 	if (!ctx->lz4_enabled) {
 		if (size > ctx->left)
@@ -178,9 +219,10 @@ size_t eu07vfs_read_file(eu07vfs_instance instance, eu07vfs_file_ctx ctx, void *
 		if (!size)
 			return 0;
 
-		seek(instance->storage, ctx->pos);
+        seek(ctx->accessor, ctx->pos);
 
-		size_t read = fread(output, 1, size, instance->storage);
+        size_t read = fread(output, 1, size, ctx->accessor->storage);
+        ctx->accessor->pos += read;
 		ctx->pos += read;
 		ctx->left -= read;
 
@@ -192,7 +234,6 @@ size_t eu07vfs_read_file(eu07vfs_instance instance, eu07vfs_file_ctx ctx, void *
 			ctx->buffer = malloc(BUFSIZE);
 		}
 
-		int seekreq = 1;
 		size_t decomp_bytes = 0;
 		while (decomp_bytes < size)
 		{
@@ -203,12 +244,11 @@ size_t eu07vfs_read_file(eu07vfs_instance instance, eu07vfs_file_ctx ctx, void *
 			size_t read = 0;
 			if (src_size) {
 				assert(ctx->buffer + ctx->leftover + src_size <= ctx->buffer + BUFSIZE);
-				if (seekreq)
-					seek(instance->storage, ctx->pos);
-				read = fread(ctx->buffer + ctx->leftover, 1, src_size, instance->storage);
+                seek(ctx->accessor, ctx->pos);
+                read = fread(ctx->buffer + ctx->leftover, 1, src_size, ctx->accessor->storage);
+                ctx->accessor->pos += read;
 				ctx->pos += read;
-				ctx->left -= read;
-				seekreq = 0;
+                ctx->left -= read;
 			}
 
 			src_size = ctx->leftover + read;
@@ -237,7 +277,61 @@ size_t eu07vfs_read_file(eu07vfs_instance instance, eu07vfs_file_ctx ctx, void *
 	return 0;
 }
 
-void eu07vfs_close_file(eu07vfs_instance instance, eu07vfs_file_ctx ctx)
+struct scandir_state {
+    const char *prefix;
+    size_t prefixlen;
+
+    const char *postfix;
+    size_t postfixlen;
+
+    char** dst;
+    size_t size;
+
+    size_t added;
+};
+
+static bool hashmap_scandir(const void *item, void *udata) {
+    struct scandir_state *state = udata;
+    const struct hash_entry *entry = item;
+
+    if (state->size == state->added)
+        return false;
+
+    if (entry->namelen < state->prefixlen || memcmp(entry->name, state->prefix, state->prefixlen) != 0)
+        return true;
+
+    if (entry->namelen < state->postfixlen || memcmp(&entry->name[entry->namelen - state->postfixlen], state->postfix, state->postfixlen) != 0)
+        return true;
+
+    *(state->dst++) = entry->name;
+    state->added++;
+
+    return true;
+}
+
+size_t eu07vfs_scandir(eu07vfs_instance instance,
+                       const char *prefix, size_t prefixlen,
+                       const char *postfix, size_t postfixlen,
+                       char** names, size_t namessize)
+{
+    struct scandir_state state;
+
+    state.prefix = prefix;
+    state.prefixlen = prefixlen;
+
+    state.postfix = postfix;
+    state.postfixlen = postfixlen;
+
+    state.dst = names;
+    state.size = namessize;
+    state.added = 0;
+
+    hashmap_scan(instance->hm, hashmap_scandir, &state);
+
+    return state.added;
+}
+
+void eu07vfs_close_file(eu07vfs_file_ctx ctx)
 {
 	if (ctx->lz4_enabled)
 		LZ4F_freeDecompressionContext(ctx->lz4_ctx);
@@ -246,9 +340,10 @@ void eu07vfs_close_file(eu07vfs_instance instance, eu07vfs_file_ctx ctx)
 	free(ctx);
 }
 
-void eu07vfs_destroy(eu07vfs_instance instance)
+void eu07vfs_destroy_instance(eu07vfs_instance instance)
 {
 	hashmap_scan(instance->hm, user_iter, NULL);
 	hashmap_free(instance->hm);
+    free(instance->filename);
 	free(instance);
 }

@@ -10,15 +10,24 @@ scenery_scanner::scenery_scanner(ui::vehicles_bank &bank)
 
 void scenery_scanner::scan()
 {
-	for (auto &f : std::filesystem::directory_iterator("scenery")) {
-		std::filesystem::path path(std::filesystem::relative(f.path(), "scenery/"));
+    const size_t MAX_SCENARIOS = 1024;
+    char **filenames = new char*[MAX_SCENARIOS];
+
+    std::string dirprefix("scenery/");
+    std::string ext(".scn");
+    size_t count = eu07vfs_scandir(Global.vfs_instance, dirprefix.data(), dirprefix.size(), ext.data(), ext.size(), filenames, MAX_SCENARIOS);
+
+    for (size_t i = 0; i < count; i++) {
+        std::string path_str(filenames[i]);
+        std::filesystem::path path(std::filesystem::relative(std::filesystem::path(path_str), "scenery/"));
 
 		if (*(path.filename().string().begin()) == '$')
 			continue;
 
-		if (string_ends_with(path.string(), ".scn"))
-			scan_scn(path);
+        scan_scn(path);
 	}
+
+    delete[] filenames;
 
 	std::sort(scenarios.begin(), scenarios.end(),
 	          [](const scenery_desc &a, const scenery_desc &b) { return a.path < b.path; });
@@ -40,7 +49,7 @@ void scenery_scanner::scan_scn(std::filesystem::path path)
 			parse_trainset(parser);
 	}
 
-	std::ifstream stream(file_path, std::ios_base::binary | std::ios_base::in);
+    ivfsstream stream(file_path, std::ios_base::binary | std::ios_base::in);
 
 	int line_counter = 0;
 	std::string line;

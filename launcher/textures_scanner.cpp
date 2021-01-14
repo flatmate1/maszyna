@@ -4,12 +4,19 @@
 
 void ui::vehicles_bank::scan_textures()
 {
-	for (auto &f : std::filesystem::recursive_directory_iterator("dynamic")) {
-		if (f.path().filename() != "textures.txt")
-			continue;
+    const size_t MAX_TEXTURES = 1024;
+    char **filenames = new char*[MAX_TEXTURES];
 
-		std::fstream stream(f.path(), std::ios_base::binary | std::ios_base::in);
-		ctx_path = std::filesystem::relative(f.path().parent_path(), "dynamic/");
+    std::string dirprefix("dynamic/");
+    std::string ext("/textures.txt");
+    size_t count = eu07vfs_scandir(Global.vfs_instance, dirprefix.data(), dirprefix.size(), ext.data(), ext.size(), filenames, MAX_TEXTURES);
+
+    for (size_t i = 0; i < count; i++) {
+        std::string path_str(filenames[i]);
+        std::filesystem::path path(path_str);
+
+        ivfsstream stream(path, std::ios_base::binary | std::ios_base::in);
+        ctx_path = std::filesystem::relative(path.parent_path(), "dynamic/");
 
 		std::string line;
 		while (std::getline(stream, line))
@@ -23,6 +30,8 @@ void ui::vehicles_bank::scan_textures()
 			parse_entry(line);
 		}
 	}
+
+    delete[] filenames;
 }
 
 void ui::vehicles_bank::parse_entry(const std::string &line)

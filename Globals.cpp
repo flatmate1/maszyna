@@ -1398,3 +1398,5 @@ global_settings::export_as_text( std::ostream &Output, std::string const Key, bo
 
     Output << Key << " " << ( Value ? "yes" : "no" ) << "\n";
 }
+
+thread_local vfs_accessor_wrapper vfs_accessor;

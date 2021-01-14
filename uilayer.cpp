@@ -131,10 +131,20 @@ ui_layer::ui_layer()
 
 void::ui_layer::load_random_background()
 {
+    const size_t MAX_IMAGES = 1024;
+    char **filenames = new char*[MAX_IMAGES];
+
+    std::string dirprefix("textures/logo/");
+    size_t count = eu07vfs_scandir(Global.vfs_instance, dirprefix.data(), dirprefix.size(), nullptr, 0, filenames, MAX_IMAGES);
+
 	std::vector<std::string> images;
-	for (auto &f : std::filesystem::directory_iterator("textures/logo"))
-		if (f.is_regular_file())
-			images.emplace_back(std::filesystem::relative(f.path(), "textures/").string());
+    for (size_t i = 0; i < count; i++) {
+        std::string path_str(filenames[i]);
+        std::filesystem::path path(path_str);
+        images.emplace_back(std::filesystem::relative(path, "textures/").string());
+    }
+
+    delete[] filenames;
 
 	if (!images.empty()) {
 		std::string &selected = images[std::lround(LocalRandom(images.size() - 1))];

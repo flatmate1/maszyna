@@ -128,6 +128,7 @@ public:
         set_progress( float const Progress = 0.0f, float const Subtaskprogress = 0.0f );
     void
         set_progress( std::string const &Text ) { m_progresstext = Text; }
+    void load_random_background();
 	// sets the ui background texture, if any
 	void
         set_background( std::string const &Filename = "" );
@@ -156,7 +157,6 @@ protected:
     static ImGuiIO *m_imguiio;
     static bool m_cursorvisible;    
 
-	void load_random_background();
    virtual void render_menu_contents();
    ui_log_panel m_logpanel { "Log", true };
 

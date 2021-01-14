@@ -631,7 +631,7 @@ opengl_texture::load_DDS()
 
 void
 opengl_texture::load_KTX() {
-    std::ivfsstream file( name + type, std::ios::binary | std::ios::ate ); file.unsetf( std::ios::skipws );
+    ivfsstream file( name + type, std::ios::binary | std::ios::ate ); file.unsetf( std::ios::skipws );
     std::size_t filesize = static_cast<size_t>(file.tellg());   // ios::ate already positioned us at the end of the file
     file.seekg( 0, std::ios::beg ); // rewind the caret afterwards
 

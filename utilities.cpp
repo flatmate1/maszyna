@@ -407,7 +407,7 @@ bool FileExistsDirect( std::string const &Filename ) {
 }
 
 bool FileExists(std::string const &Filename) {
-    eu07vfs_file_handle handle = eu07vfs_lookup_file(Global.vfs, Filename.data(), Filename.size());
+    eu07vfs_file_handle handle = eu07vfs_lookup_file(Global.vfs_instance, Filename.data(), Filename.size());
     return handle != EU07VFS_NULL_HANDLE;
 }
 

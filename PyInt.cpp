@@ -144,6 +144,40 @@ void render_task::cancel() {
     delete this;
 }
 
+static PyObject *eu07exe_file_exists(PyObject *, PyObject *args) {
+    const char *file;
+
+    if (!PyArg_ParseTuple(args, "s", &file))
+        return nullptr;
+
+    bool exists = FileExists(std::string(file));
+
+    return PyBool_FromLong(exists);
+}
+
+static PyObject *eu07exe_read_file(PyObject *, PyObject *args) {
+    const char *file;
+
+    if (!PyArg_ParseTuple(args, "s", &file))
+        return nullptr;
+
+    ivfsstream stream(std::string(file), std::ios_base::ate);
+    size_t filesize = stream.tellg();
+    stream.seekg(0, std::ios_base::beg);
+
+    char *buffer = new char[filesize];
+    PyObject *obj = PyByteArray_FromStringAndSize(buffer, filesize);
+    delete[] buffer;
+
+    return obj;
+}
+
+static PyMethodDef eu07exe_methods[] = {
+    { "file_exists", eu07exe_file_exists, METH_VARARGS, "Check if file exists in virtual file system" },
+    { "read_file", eu07exe_read_file, METH_VARARGS, "Reads file from the virtual file system into bytearray" },
+    { nullptr, nullptr, 0, nullptr }
+};
+
 // initializes the module. returns true on success
 auto python_taskqueue::init() -> bool {
 
@@ -166,6 +200,7 @@ auto python_taskqueue::init() -> bool {
     Py_InitializeEx(0);
 
     PyEval_InitThreads();
+    Py_InitModule("eu07exe", eu07exe_methods);
 
 	PyObject *stringiomodule { nullptr };
 	PyObject *stringioclassname { nullptr };

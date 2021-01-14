@@ -6,6 +6,7 @@
 
 class ivfsbuf : public std::streambuf {
     eu07vfs_file_ctx vfs_ctx;
+    eu07vfs_accessor vfs_accessor;
     eu07vfs_file_handle handle;
     char *buffer;
     const size_t BUFSIZE = 1024 * 64;
@@ -23,7 +24,7 @@ class ivfsbuf : public std::streambuf {
     }
 
 public:
-    ivfsbuf(const std::string &filename, std::ios_base::openmode mode = std::ios_base::in) {
+    ivfsbuf(const std::string &filename, eu07vfs_accessor accessor, std::ios_base::openmode mode = std::ios_base::in) {
         virtual_pos = 0;
         vfs_pos = 0;
         buffer_pos = 0;
@@ -32,16 +33,17 @@ public:
         vfs_ctx = nullptr;
         file_size = 0;
 
-        handle = eu07vfs_lookup_file(Global.vfs, filename.data(), filename.size());
+        vfs_accessor = accessor;
+        handle = eu07vfs_lookup_file(Global.vfs_instance, filename.data(), filename.size());
 
         if (handle == EU07VFS_NULL_HANDLE)
             return;
 
-        vfs_ctx = eu07vfs_open_file(Global.vfs, handle);
+        vfs_ctx = eu07vfs_open_file(vfs_accessor, handle);
         if (!vfs_ctx)
             return;
 
-        file_size = eu07vfs_get_file_size(Global.vfs, vfs_ctx);
+        file_size = eu07vfs_get_file_size(vfs_ctx);
         buffer = new char[BUFSIZE];
         this->setg(nullptr, nullptr, nullptr);
 
@@ -51,7 +53,7 @@ public:
 
     ~ivfsbuf() {
         if (vfs_ctx)
-            eu07vfs_close_file(Global.vfs, vfs_ctx);
+            eu07vfs_close_file(vfs_ctx);
         if (buffer)
             delete[] buffer;
     }
@@ -79,8 +81,8 @@ public:
         if (virtual_pos < vfs_pos) {
             // we need to seek backwards
             // we cannot do that, reopen file
-            eu07vfs_close_file(Global.vfs, vfs_ctx);
-            vfs_ctx = eu07vfs_open_file(Global.vfs, handle);
+            eu07vfs_close_file(vfs_ctx);
+            vfs_ctx = eu07vfs_open_file(vfs_accessor, handle);
             vfs_pos = 0;
         }
         if (virtual_pos > vfs_pos) {
@@ -91,7 +93,7 @@ public:
                 if (read > BUFSIZE)
                     read = BUFSIZE;
 
-                read = eu07vfs_read_file(Global.vfs, vfs_ctx, buffer, read);
+                read = eu07vfs_read_file(vfs_ctx, buffer, read);
                 buffer_pos = vfs_pos;
                 buffer_size = read;
                 vfs_pos += read;
@@ -103,7 +105,7 @@ public:
         // now at proper position, just read the data
         assert(vfs_pos == virtual_pos);
 
-        size_t size = eu07vfs_read_file(Global.vfs, vfs_ctx, buffer, BUFSIZE);
+        size_t size = eu07vfs_read_file(vfs_ctx, buffer, BUFSIZE);
         buffer_pos = vfs_pos;
         buffer_size = size;
         vfs_pos += size;
@@ -119,7 +121,7 @@ public:
         return file_size - virtual_pos;
     }
 
-    std::streampos seekoff(std::streamoff off, std::ios_base::seekdir way, std::ios_base::openmode which) override {
+    std::streampos seekoff(std::streamoff off, std::ios_base::seekdir way, std::ios_base::openmode) override {
         update_virtualpos();
 
         size_t pos;
@@ -169,11 +171,11 @@ public:
 
         char *ori_target = target;
 
-        if (size < BUFSIZE / 4) // small read, let's fetch data to our buffer
+        if (size < (std::streamsize)BUFSIZE / 4) // small read, let's fetch data to our buffer
             underflow();
 
         { // some data should be available in buffer, copy it
-            size_t data_avail = this->egptr() - this->gptr();
+            std::streamsize data_avail = this->egptr() - this->gptr();
             if (data_avail > size)
                 data_avail = size;
 
@@ -189,7 +191,7 @@ public:
             return target - ori_target;
 
         // still something to read, do it directly
-        size_t read = eu07vfs_read_file(Global.vfs, vfs_ctx, target, size);
+        size_t read = eu07vfs_read_file(vfs_ctx, target, size);
         target += read;
         vfs_pos += read;
         virtual_pos += read;
@@ -200,10 +202,13 @@ public:
 
 struct ivfsstream_base {
     ivfsbuf sbuf_;
-    ivfsstream_base(const std::string &filename, std::ios_base::openmode mode = std::ios_base::in): sbuf_(filename, mode) {}
+    ivfsstream_base(const std::string &filename, eu07vfs_accessor accessor, std::ios_base::openmode mode = std::ios_base::in): sbuf_(filename, accessor, mode) {}
 };
 
 class ivfsstream : virtual ivfsstream_base, public std::istream {
 public:
-    ivfsstream(const std::string &filename, std::ios_base::openmode mode = std::ios_base::in) : ivfsstream_base(filename, mode), std::ios(&this->sbuf_), std::istream(&this->sbuf_) {}
+    ivfsstream(const std::string &filename, std::ios_base::openmode mode = std::ios_base::in) :
+        ivfsstream_base(filename, vfs_accessor.get(Global.vfs_instance), mode),
+        std::ios(&this->sbuf_), std::istream(&this->sbuf_) {}
 };
+
