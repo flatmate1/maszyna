@@ -242,12 +242,14 @@ bool ui_layer::init(GLFWwindow *Window)
 
     ImGui_ImplGlfw_InitForOpenGL(m_window, false);
 #ifdef EU07_USEIMGUIIMPLOPENGL2
+	crashreport_add_info("imgui_ver", "gl2");
 	ImGui_ImplOpenGL2_Init();
 #else
+    crashreport_add_info("imgui_ver", "gl3");
     if (Global.gfx_usegles)
         ImGui_ImplOpenGL3_Init("#version 300 es\nprecision highp float;");
     else
-		ImGui_ImplOpenGL3_Init("#version 330 core");
+        ImGui_ImplOpenGL3_Init("#version 330 core");
 #endif
 
     return true;

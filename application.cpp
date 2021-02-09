@@ -54,7 +54,6 @@ extern "C"
     GLFWAPI HWND glfwGetWin32Window( GLFWwindow* window );
 }
 
-LONG CALLBACK unhandled_handler( ::EXCEPTION_POINTERS* e );
 LRESULT APIENTRY WndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam );
 extern HWND Hwnd;
 extern WNDPROC BaseWindowProc;
@@ -146,6 +145,7 @@ eu07_application::init( int Argc, char *Argv[] ) {
     if( ( result = init_data() ) != 0 ) {
         return result;
     }
+    crashreport_add_info("python_enabled", Global.python_enabled ? "yes" : "no");
     if( Global.python_enabled ) {
         m_taskqueue.init();
     }
@@ -625,9 +625,6 @@ eu07_application::init_debug() {
     state = _control87( state & ~( _EM_ZERODIVIDE | _EM_INVALID ), _MCW_EM );
     */
 #endif
-#ifdef _WIN32
-    ::SetUnhandledExceptionFilter( unhandled_handler );
-#endif
 }
 
 void
@@ -743,6 +740,8 @@ eu07_application::init_glfw() {
     if (Global.gfx_skippipeline && Global.iMultisampling > 0) {
         glfwWindowHint( GLFW_SAMPLES, 1 << Global.iMultisampling );
     }
+
+    crashreport_add_info("gfxrenderer", Global.GfxRenderer);
 
     if( Global.GfxRenderer == "default" ) {
         Global.bUseVBO = true;
