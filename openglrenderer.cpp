@@ -4346,8 +4346,8 @@ opengl_renderer::Init_caps() {
     crashreport_add_info("gl_mode", Global.bUseVBO ? "vbo" : "dl");
 
     WriteLog(
-        "Gfx Renderer: " + gl_renderer )
-        + " Vendor: " + gl_vendor )
+        "Gfx Renderer: " + gl_renderer
+        + " Vendor: " + gl_vendor
         + " OpenGL Version: " + gl_version );
 
 #ifdef EU07_USEIMGUIIMPLOPENGL2

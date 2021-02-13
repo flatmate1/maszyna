@@ -141,11 +141,14 @@ jobs:
     - script: |
         cd ref
         git clone "https://github.com/chriskohlhoff/asio" --depth 1 --branch asio-1-12-2 -q
+        wget "http://get.backtrace.io/crashpad/builds/release/x86-64/crashpad-2020-07-01-release-x64-558c9614e3819179f30b92541450f5ac643afce5.zip"
+        unzip crashpad-2020-07-01-release-x64-558c9614e3819179f30b92541450f5ac643afce5.zip
+        move crashpad-2020-07-01-release-x64-558c9614e3819179f30b92541450f5ac643afce5 crashpad
       displayName: 'Download extra dependencies'
     - script: |
         mkdir build
         cd build
-        cmake .. -A x64 -DUSE_LTO=ON
+        cmake .. -A x64 -DUSE_LTO=ON -DWITH_CRASHPAD=ON
         cmake --build . --config RelWithDebInfo
       displayName: 'Build'
     - task: PublishBuildArtifacts@1

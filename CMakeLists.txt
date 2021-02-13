@@ -52,6 +52,7 @@ option(WITH_OPENGL_LEGACY "Compile with OpenGL legacy renderer" ON)
 option(WITH_UART "Compile with libserialport" ON)
 option(WITH_OPENVR "Compile with OpenVR" ON)
 option(WITH_ZMQ "Compile with cppzmq" OFF)
+option(WITH_CRASHPAD "Compile with crashpad" OFF)
 option(USE_LTO "Use link-time optimization" OFF)
 
 set(SOURCES
@@ -148,7 +149,6 @@ set(SOURCES
 "openglcolor.cpp"
 "simulationsounds.cpp"
 "openglcamera.cpp"
-"crashreporter.cpp"
 
 "network/network.cpp"
 "network/message.cpp"
@@ -205,6 +205,16 @@ else()
 	add_definitions(-DEU07_USEIMGUIIMPLOPENGL2)
 	set(SOURCES ${SOURCES} "imgui/imgui_impl_opengl2.cpp")
 	set_source_files_properties("imgui/imgui_impl_opengl2.cpp" PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
+endif()
+
+if (WITH_CRASHPAD)
+	add_definitions(-DWITH_CRASHPAD)
+	set(SOURCES ${SOURCES} "crashreporter.cpp")
+	if (WIN32)
+		include_directories("ref/crashpad/include")
+	else()
+		include_directories("ref/crashpad/crashpad" "ref/crashpad/crashpad/third_party/mini_chromium/mini_chromium")
+	endif()
 endif()
 
 if (WITH_UART)
@@ -357,7 +367,6 @@ if(NOT ${CMAKE_VERSION} VERSION_LESS "3.16.0")
 		target_precompile_headers(${PROJECT_NAME} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/stdafx.h>")
 		set_source_files_properties("ref/glad/src/glad.c" "ref/dds-ktx/src/dds-ktx.c" "stb/stb_image.c"
 			"imgui/imgui.cpp" "imgui/imgui_demo.cpp" "imgui/imgui_draw.cpp" "imgui/imgui_widgets.cpp" "imgui/imgui_impl_glfw.cpp"
-			"crashreporter.cpp"
 			PROPERTIES SKIP_PRECOMPILE_HEADERS TRUE)
 	endif()
 endif()
@@ -367,8 +376,20 @@ if (USE_LTO)
 endif()
 
 if (WITH_OPENVR)
-	    include_directories(${OPENVR_INCLUDE_DIR})
-		target_link_libraries(${PROJECT_NAME} ${OPENVR_LIBRARY})
+	include_directories(${OPENVR_INCLUDE_DIR})
+	target_link_libraries(${PROJECT_NAME} ${OPENVR_LIBRARY})
+endif()
+
+if (WITH_CRASHPAD)
+	if (WIN32)
+		target_link_libraries(${PROJECT_NAME} "${CMAKE_SOURCE_DIR}/ref/crashpad/lib_md/base.lib")
+		target_link_libraries(${PROJECT_NAME} "${CMAKE_SOURCE_DIR}/ref/crashpad/lib_md/client.lib")
+		target_link_libraries(${PROJECT_NAME} "${CMAKE_SOURCE_DIR}/ref/crashpad/lib_md/util.lib")
+	else()
+		target_link_libraries(${PROJECT_NAME} "${CMAKE_SOURCE_DIR}/ref/crashpad/crashpad/out/Default/obj/client/libclient.a")
+		target_link_libraries(${PROJECT_NAME} "${CMAKE_SOURCE_DIR}/ref/crashpad/crashpad/out/Default/obj/util/libutil.a")
+		target_link_libraries(${PROJECT_NAME} "${CMAKE_SOURCE_DIR}/ref/crashpad/crashpad/out/Default/obj/third_party/mini_chromium/mini_chromium/base/libbase.a")
+	endif()
 endif()
 
 find_package(glfw3 REQUIRED)

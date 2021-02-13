@@ -337,16 +337,26 @@ void ui_layer::render()
     render_();
 
 	gl::buffer::unbind(gl::buffer::ARRAY_BUFFER);
+    render_internal();
+}
+
+void ui_layer::render_internal()
+{
     ImGui::Render();
 
 #ifdef EU07_USEIMGUIIMPLOPENGL2
-	ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
+    ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
 #else
-	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 #endif
 }
 
 void ui_layer::begin_ui_frame()
+{
+    begin_ui_frame_internal();
+}
+
+void ui_layer::begin_ui_frame_internal()
 {
 #ifdef EU07_USEIMGUIIMPLOPENGL2
 	ImGui_ImplOpenGL2_NewFrame();
