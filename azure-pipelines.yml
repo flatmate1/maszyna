@@ -153,7 +153,7 @@ jobs:
       displayName: 'Build'
     - script: |
         cd build
-        zip -r -j package.zip bin pdb
+        7z a package.zip ./bin/* ./pdb/*
         curl --data-binary @package.zip -H "Expect:" "https://eu07.sp.backtrace.io:6098/post?format=symbols&token=4eeba9395fae661927e23679fc36f2237416ec056ef75399e894d597ad518c6c"
       displayName: 'Upload symbols'
     - task: PublishBuildArtifacts@1
