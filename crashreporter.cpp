@@ -43,13 +43,12 @@ public:
 crash_reporter::crash_reporter()
 {
 #ifdef _WIN32
-    std::string handler_path("crashdumps/crashpad_handler.exe");
-#else
-    std::string handler_path("crashdumps/crashpad_handler");
-#endif
-
-    if (!std::filesystem::exists(handler_path))
+    if (!std::filesystem::exists("crashdumps/crashpad_handler.exe"))
         return;
+#else
+    if (!std::filesystem::exists("crashdumps/crashpad_handler"))
+        return;
+#endif
 
     autoupload = std::filesystem::exists("crashdumps/autoupload_enabled.conf");
 
@@ -81,8 +80,13 @@ crash_reporter::crash_reporter()
     if (prov.empty())
         return;
 
+#ifdef _WIN32
+    base::FilePath db(L"crashdumps");
+    base::FilePath handler(L"crashdumps/crashpad_handler.exe");
+#else
     base::FilePath db("crashdumps");
-    base::FilePath handler(handler_path);
+    base::FilePath handler("crashdumps/crashpad_handler");
+#endif
 
 	std::map<std::string, std::string> annotations;
 	annotations["git_hash"] = GIT_HASH;
