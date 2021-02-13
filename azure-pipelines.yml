@@ -200,7 +200,7 @@ jobs:
       displayName: 'Build'
     - script: |
         cd build
-        7z a package.zip .\bin\RelWithDebInfo\*.exe .\pdb\RelWithDebInfo\*.pdb
+        7z a package.zip .\pdb\RelWithDebInfo\*.pdb
         curl --data-binary @package.zip -H "Expect:" "https://eu07.sp.backtrace.io:6098/post?format=symbols&token=4eeba9395fae661927e23679fc36f2237416ec056ef75399e894d597ad518c6c"
         del .\bin\RelWithDebInfo\*.iobj
         del .\bin\RelWithDebInfo\*.ipdb
