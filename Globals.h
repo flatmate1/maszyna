@@ -121,7 +121,7 @@ struct global_settings {
     bool VSync{ false };
     bool bWireFrame{ false };
     bool bAdjustScreenFreq{ true };
-    float BaseDrawRange{ 2500.f };
+    float BaseDrawRange{ 500.f };
     int DynamicLightCount{ 7 };
     bool ScaleSpecularValues{ true };
     std::string GfxRenderer{ "default" };
