@@ -137,10 +137,6 @@ jobs:
     displayName: 'Windows VS2017 x86-64'
     steps:
     - script: |
-        cd ref
-        git clone "https://github.com/chriskohlhoff/asio" --depth 1 --branch asio-1-12-2 -q
-      displayName: 'Download extra dependencies'
-    - script: |
         mkdir build
         cd build
         cmake .. -A x64 -DUSE_LTO=ON -DWITH_CRASHPAD=ON
