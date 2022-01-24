@@ -482,7 +482,7 @@ bool opengl33_renderer::init_viewport(viewport_config &vp)
     if (vp.custom_backbuffer)
     {
         vp.backbuffer_tex = std::make_unique<opengl_texture>();
-        vp.backbuffer_tex->alloc_rendertarget(GL_SRGB8, GL_RGB, vp.width, vp.height);
+        vp.backbuffer_tex->alloc_rendertarget(GL_SRGB8_ALPHA8, GL_RGBA, vp.width, vp.height);
 
         vp.backbuffer_fb = std::make_unique<gl::framebuffer>();
         vp.backbuffer_fb->attach(*vp.backbuffer_tex, GL_COLOR_ATTACHMENT0);
